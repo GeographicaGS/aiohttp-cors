@@ -75,13 +75,16 @@ class _PreflightHandler:
                 text="CORS preflight request failed: "
                      "no origins are allowed")
 
-        options = config.get(origin, config.get("*"))
+        from_wildcard = False
+        options = config.get(origin)
         if options is None:
-            # No configuration for the origin - deny.
-            # Terminate CORS according to CORS 6.2.2.
-            raise web.HTTPForbidden(
-                text="CORS preflight request failed: "
-                     "origin '{}' is not allowed".format(origin))
+            options, from_wildcard = config.get("*"), True
+            if options is None:
+                # No configuration for the origin - deny.
+                # Terminate CORS according to CORS 6.2.2.
+                raise web.HTTPForbidden(
+                    text="CORS preflight request failed: "
+                        "origin '{}' is not allowed".format(origin))
 
         # CORS 6.2.4
         request_headers = self._parse_request_headers(request)
@@ -104,10 +107,16 @@ class _PreflightHandler:
         response = web.Response()
 
         # CORS 6.2.7
-        response.headers[hdrs.ACCESS_CONTROL_ALLOW_ORIGIN] = origin
-        if options.allow_credentials:
-            # Set allowed credentials.
-            response.headers[hdrs.ACCESS_CONTROL_ALLOW_CREDENTIALS] = _TRUE
+        if from_wildcard:
+            # Set allowed origin.
+            response.headers[hdrs.ACCESS_CONTROL_ALLOW_ORIGIN] = "*"
+        else:
+            # Set allowed origin.
+            response.headers[hdrs.ACCESS_CONTROL_ALLOW_ORIGIN] = origin
+
+            if options.allow_credentials:
+                # Set allowed credentials.
+                response.headers[hdrs.ACCESS_CONTROL_ALLOW_CREDENTIALS] = _TRUE
 
         # CORS 6.2.8
         if options.max_age is not None:
